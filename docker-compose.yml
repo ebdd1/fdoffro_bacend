@@ -1,0 +1,27 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: kostfind_db
+    environment:
+      POSTGRES_USER: kostfind_user
+      POSTGRES_PASSWORD: kostfind_password
+      POSTGRES_DB: kostfind_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - kostfind_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: kostfind_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - kostfind_redisdata:/data
+    restart: unless-stopped
+
+volumes:
+  kostfind_pgdata:
+  kostfind_redisdata:

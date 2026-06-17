@@ -1,0 +1,38 @@
+# Dependencies
+node_modules
+
+# Local npm cache
+npm-cache
+
+# Build output
+dist
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Runtime user uploads (local disk storage)
+uploads/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Test / coverage
+coverage
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+
+# AI agent skills
+.insforge
+.claude
+.agent
+.agents

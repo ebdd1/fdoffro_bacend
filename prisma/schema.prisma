@@ -1,0 +1,220 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  password_hash String?  // Made optional for backwards compatibility
+  phone         String?
+  role          String   // 'seeker' | 'owner' | 'admin'
+  avatar_url    String?
+  banner_url    String?
+  isVerified    Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  // Relations
+  ownedProperties Property[]     @relation("OwnerToProperty")
+  watchlists      Watchlist[]
+  smartAlerts     SmartAlert[]
+
+  // Conversation Roles
+  conversationsAsSeeker Conversation[] @relation("SeekerToConversation")
+  conversationsAsOwner  Conversation[] @relation("OwnerToConversation")
+  messages              Message[]
+
+  // Rental orders
+  ordersAsSeeker RentalOrder[] @relation("SeekerOrders")
+  ordersAsOwner  RentalOrder[] @relation("OwnerOrders")
+
+  notifications Notification[]
+
+  @@index([email])
+}
+
+model Property {
+  id          String   @id @default(uuid())
+  ownerId     String
+  name        String
+  city        String
+  address     String
+  lat         Float
+  lng         Float
+  status      String   // e.g. 'active', 'inactive'
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner       User       @relation("OwnerToProperty", fields: [ownerId], references: [id])
+  rooms       Room[]
+  watchlists  Watchlist[]
+  conversations Conversation[]
+  facilities  Facility[] @relation("PropertyFacilities")
+  orders      RentalOrder[]
+  media       Media[]   @relation("PropertyMedia")
+
+  @@index([ownerId])
+  @@index([city])
+  @@index([status])
+}
+
+model Media {
+  id            String   @id @default(uuid())
+  propertyId    String
+  url_original  String
+  url_medium    String
+  url_thumbnail String
+  latitude      Float?
+  longitude     Float?
+  capturedAt    DateTime @default(now())
+
+  property      Property @relation("PropertyMedia", fields: [propertyId], references: [id])
+
+  @@index([propertyId])
+}
+
+model Facility {
+  id         String     @id @default(uuid())
+  name       String     @unique
+  icon       String?
+  properties Property[] @relation("PropertyFacilities")
+}
+
+model Room {
+  id           String   @id @default(uuid())
+  propertyId   String
+  roomNumber   String
+  priceMonthly Float
+  status       String   // 'available' | 'occupied' | 'renovation'
+
+  property     Property @relation(fields: [propertyId], references: [id])
+  orders       RentalOrder[]
+
+  @@index([propertyId])
+  @@index([status])
+}
+
+model Conversation {
+  id           String   @id @default(uuid())
+  seekerId     String
+  ownerId      String
+  propertyId   String
+  lastMessage  String?
+  unreadCount  Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  seeker       User     @relation("SeekerToConversation", fields: [seekerId], references: [id])
+  owner        User     @relation("OwnerToConversation", fields: [ownerId], references: [id])
+  property     Property @relation(fields: [propertyId], references: [id])
+  messages     Message[]
+
+  @@index([seekerId])
+  @@index([ownerId])
+  @@index([propertyId])
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  conversationId String
+  senderId       String
+  content        String
+  contentType    String   @default("text")
+  createdAt      DateTime @default(now())
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  sender         User         @relation(fields: [senderId], references: [id])
+
+  @@index([conversationId])
+  @@index([senderId])
+}
+
+model Watchlist {
+  id         String @id @default(uuid())
+  seekerId   String
+  propertyId String
+
+  seeker     User     @relation(fields: [seekerId], references: [id])
+  property   Property @relation(fields: [propertyId], references: [id])
+
+  @@unique([seekerId, propertyId])
+  @@index([seekerId])
+}
+
+model SmartAlert {
+  id          String   @id @default(uuid())
+  seekerId    String
+  city        String
+  maxPrice    Float?
+
+  seeker      User            @relation(fields: [seekerId], references: [id])
+  keywords    AlertKeyword[]  @relation("AlertKeywords")
+
+  @@index([seekerId])
+}
+
+model AlertKeyword {
+  id          String       @id @default(uuid())
+  word        String       @unique
+  smartAlerts SmartAlert[] @relation("AlertKeywords")
+}
+
+model RentalOrder {
+  id             String   @id @default(uuid())
+  seekerId       String
+  ownerId        String
+  propertyId     String
+  roomId         String
+  status         String   // pending | awaiting_payment | active | rejected | cancelled | completed
+  startDate      DateTime
+  durationMonths Int      @default(1)
+  priceMonthly   Float
+  totalAmount    Float
+  paidAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  seeker   User     @relation("SeekerOrders", fields: [seekerId], references: [id])
+  owner    User     @relation("OwnerOrders", fields: [ownerId], references: [id])
+  property Property @relation(fields: [propertyId], references: [id])
+  room     Room     @relation(fields: [roomId], references: [id])
+
+  @@index([seekerId])
+  @@index([ownerId])
+  @@index([roomId])
+  @@index([status])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // 'order' (extensible to other domains later)
+  title     String
+  body      String
+  orderId   String?  // optional deep-link target
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([userId, isRead])
+}
+
+model SiteConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  type      String   @default("string") // "string" | "boolean" | "json"
+  isPublic  Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}
