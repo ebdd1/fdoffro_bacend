@@ -16,4 +16,16 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   banner_url?: string;
+
+  @IsOptional()
+  @IsString()
+  bankName?: string;
+
+  @IsOptional()
+  @IsString()
+  bankAccountNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  bankAccountHolder?: string;
 }

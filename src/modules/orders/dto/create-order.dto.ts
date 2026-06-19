@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsDateString, IsInt, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsDateString, IsInt, Min, IsIn } from 'class-validator';
 
 export class CreateOrderDto {
   @IsString()
@@ -11,4 +11,7 @@ export class CreateOrderDto {
   @IsInt()
   @Min(1)
   durationMonths: number;
+
+  @IsIn(['transfer', 'cod'])
+  paymentMethod: 'transfer' | 'cod';
 }

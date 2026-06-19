@@ -84,7 +84,15 @@ export class AuthService {
 
   async updateProfile(
     userId: string,
-    dto: { name?: string; phone?: string; avatar_url?: string; banner_url?: string },
+    dto: {
+      name?: string;
+      phone?: string;
+      avatar_url?: string;
+      banner_url?: string;
+      bankName?: string;
+      bankAccountNumber?: string;
+      bankAccountHolder?: string;
+    },
   ) {
     const user = await this.prisma.user.update({
       where: { id: userId },
@@ -98,6 +106,9 @@ export class AuthService {
       phone: user.phone,
       avatar_url: user.avatar_url,
       banner_url: user.banner_url,
+      bankName: user.bankName,
+      bankAccountNumber: user.bankAccountNumber,
+      bankAccountHolder: user.bankAccountHolder,
     };
   }
 

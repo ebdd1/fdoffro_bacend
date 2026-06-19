@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, NotFoundException, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, Param, NotFoundException, ForbiddenException, Query, UseGuards, Request } from '@nestjs/common';
 import { PropertiesService } from './properties.service';
 import { QueryPropertyDto } from './dto/query-property.dto';
 import { CreatePropertyDto } from './dto/create-property.dto';
@@ -63,5 +63,51 @@ export class PropertiesController {
   @ApiOperation({ summary: 'Get rooms for a property' })
   async findRooms(@Param('id') id: string) {
     return this.propertiesService.findRoomsByPropertyId(id);
+  }
+
+  @Post(':id/rooms')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Add rooms to a property (owner only)' })
+  async addRooms(
+    @Param('id') id: string,
+    @Request() req: AuthenticatedRequest,
+    @Body() body: { count: number; priceMonthly: number },
+  ) {
+    const property = await this.propertiesService.findOne(id);
+    if (!property) throw new NotFoundException(`Properti dengan ID ${id} tidak ditemukan`);
+    if ((property as any).ownerId !== req.user.id) throw new ForbiddenException('Bukan properti Anda');
+    return this.propertiesService.addRooms(id, body.count, body.priceMonthly);
+  }
+
+  @Delete(':id/rooms/:roomId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete a room from a property (owner only)' })
+  async deleteRoom(
+    @Param('id') id: string,
+    @Param('roomId') roomId: string,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    const property = await this.propertiesService.findOne(id);
+    if (!property) throw new NotFoundException(`Properti dengan ID ${id} tidak ditemukan`);
+    if ((property as any).ownerId !== req.user.id) throw new ForbiddenException('Bukan properti Anda');
+    return this.propertiesService.deleteRoom(id, roomId);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete a property (owner only)' })
+  async deleteProperty(@Param('id') id: string, @Request() req: AuthenticatedRequest) {
+    return this.propertiesService.deleteProperty(id, req.user.id);
+  }
+
+  @Delete()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Bulk delete properties (owner only)' })
+  async deletePropertiesBulk(@Body() body: { ids: string[] }, @Request() req: AuthenticatedRequest) {
+    return this.propertiesService.deletePropertiesBulk(body.ids, req.user.id);
   }
 }

@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsNumber, IsArray, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsArray, IsOptional, IsInt, Min } from 'class-validator';
 
 export class CreatePropertyDto {
   @IsString()
@@ -32,4 +32,11 @@ export class CreatePropertyDto {
   @IsNumber()
   @IsOptional()
   priceMonthly?: number;
+
+  // How many rooms to auto-create for this kost (default 1). Owner sets this
+  // to match the real number of rooms available; each room gets priceMonthly.
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  totalRooms?: number;
 }

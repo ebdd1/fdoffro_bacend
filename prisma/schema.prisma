@@ -20,6 +20,11 @@ model User {
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
 
+  // Bank account for receiving rent via transfer (owner-only, optional)
+  bankName          String?
+  bankAccountNumber String?
+  bankAccountHolder String?
+
   // Relations
   ownedProperties Property[]     @relation("OwnerToProperty")
   watchlists      Watchlist[]
@@ -172,7 +177,9 @@ model RentalOrder {
   ownerId        String
   propertyId     String
   roomId         String
-  status         String   // pending | awaiting_payment | active | rejected | cancelled | completed
+  status         String   // pending | awaiting_payment | awaiting_confirmation | active | rejected | cancelled | completed
+  paymentMethod  String?  // 'transfer' | 'cod'
+  paymentProofUrl String? // URL bukti transfer (set saat seeker submit proof)
   startDate      DateTime
   durationMonths Int      @default(1)
   priceMonthly   Float

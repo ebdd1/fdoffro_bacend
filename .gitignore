@@ -12,8 +12,8 @@ dist
 .env.*
 !.env.example
 
-# Runtime user uploads (local disk storage)
-uploads/
+# Runtime user uploads (local disk storage) — root only, NOT src/modules/uploads
+/uploads/
 
 # Logs
 logs
