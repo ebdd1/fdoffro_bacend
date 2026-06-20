@@ -84,7 +84,13 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
       const wasOffline = sockets.size === 0;
       sockets.add(client.id);
       this.onlineUsers.set(userId, sockets);
+
+      // Auto-join user's personal room for targeted events
+      client.join(userId);
+      if (payload.role === 'admin') client.join('admins');
+
       if (wasOffline) {
+        // Broadcast to all connected clients (they filter on frontend)
         this.server.emit('presence:update', { userId, online: true });
       }
     } catch (err) {
