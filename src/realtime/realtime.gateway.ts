@@ -29,6 +29,9 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   @WebSocketServer()
   server: Server;
 
+  // Presence: userId → set of connected socketIds (handles multi-tab) [presence]
+  private onlineUsers = new Map<string, Set<string>>();
+
   constructor(private readonly jwtService: JwtService) {}
 
   // Verify JWT before allowing connection [F-014]
@@ -44,6 +47,16 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       // Attach verified user data to socket for later use
       (client as any).user = { id: payload.sub, email: payload.email, role: payload.role };
       console.log(`[Socket] Connected: user ${payload.sub} (${client.id})`);
+
+      // Track presence — broadcast online when this is the user's first socket [presence]
+      const userId = payload.sub;
+      const sockets = this.onlineUsers.get(userId) ?? new Set<string>();
+      const wasOffline = sockets.size === 0;
+      sockets.add(client.id);
+      this.onlineUsers.set(userId, sockets);
+      if (wasOffline) {
+        this.server.emit('presence:update', { userId, online: true });
+      }
     } catch (err) {
       console.warn(`[Socket] Invalid token — disconnecting client ${client.id}`);
       client.disconnect();
@@ -53,6 +66,19 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   handleDisconnect(client: Socket) {
     const user = (client as any).user;
     console.log(`[Socket] Disconnected: ${user?.id ?? 'unknown'} (${client.id})`);
+
+    // Track presence — broadcast offline when the user's last socket disconnects [presence]
+    const userId = user?.id;
+    if (userId) {
+      const sockets = this.onlineUsers.get(userId);
+      if (sockets) {
+        sockets.delete(client.id);
+        if (sockets.size === 0) {
+          this.onlineUsers.delete(userId);
+          this.server.emit('presence:update', { userId, online: false });
+        }
+      }
+    }
   }
 
   private extractToken(client: Socket): string | null {
@@ -99,5 +125,13 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
       });
     }
     return { ok: true };
+  }
+
+  /**
+   * Return list of currently online userIds for initial presence state [presence]
+   */
+  @SubscribeMessage('presence:check')
+  handlePresenceCheck() {
+    return { onlineUserIds: Array.from(this.onlineUsers.keys()) };
   }
 }
