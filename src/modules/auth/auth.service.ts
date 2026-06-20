@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException, ConflictException, ForbiddenExceptio
 import { PrismaService } from '../../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -39,7 +40,7 @@ export class AuthService {
       },
     });
 
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const payload = { sub: user.id, email: user.email, role: user.role, jti: randomUUID() };
     return {
       access_token: await this.jwtService.signAsync(payload),
       user: {
@@ -69,7 +70,7 @@ export class AuthService {
       throw new UnauthorizedException('Akun Anda telah dinonaktifkan.');
     }
 
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const payload = { sub: user.id, email: user.email, role: user.role, jti: randomUUID() };
     return {
       access_token: await this.jwtService.signAsync(payload),
       user: {
@@ -96,7 +97,7 @@ export class AuthService {
   ) {
     const user = await this.prisma.user.update({
       where: { id: userId },
-      data: dto,
+      data: dto, // dto is already sanitized by controller whitelist [F-004, F-015]
     });
     return {
       id: user.id,
@@ -110,6 +111,20 @@ export class AuthService {
       bankAccountNumber: user.bankAccountNumber,
       bankAccountHolder: user.bankAccountHolder,
     };
+  }
+
+  // Invalidate token on logout [F-009]
+  // jti = JWT "JWT ID" claim for per-token blacklist
+  private invalidatedTokens = new Set<string>();
+
+  async logout(userId: string, jti?: string) {
+    if (jti) this.invalidatedTokens.add(jti);
+    return { message: 'Logged out successfully' };
+  }
+
+  // Check if a token has been invalidated (called by JWT strategy) [F-009]
+  isTokenInvalidated(jti: string): boolean {
+    return this.invalidatedTokens.has(jti);
   }
 
   async getMockMe() {

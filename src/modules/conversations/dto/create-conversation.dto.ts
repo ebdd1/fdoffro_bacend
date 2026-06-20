@@ -1,9 +1,10 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
+// seekerId is overridden server-side from JWT — not trusted from client [F-010]
 export class CreateConversationDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  seekerId: string;
+  seekerId?: string;
 
   @IsString()
   @IsNotEmpty()

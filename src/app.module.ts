@@ -19,10 +19,18 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 
 @Module({
   imports: [
-    ThrottlerModule.forRoot([{
-      ttl: 60000,
-      limit: 100, // 100 requests per minute
-    }]),
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 60000,    // 1 minute window
+        limit: 30,     // 30 requests per minute globally
+      },
+      {
+        name: 'auth',
+        ttl: 60000,
+        limit: 10,      // 10 requests per minute on auth endpoints [F-005, F-006]
+      },
+    ]),
     PrismaModule,
     PropertiesModule,
     AuthModule,

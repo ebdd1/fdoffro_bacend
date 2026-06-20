@@ -6,6 +6,8 @@ import { AllExceptionsFilter } from './all-exceptions.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -15,8 +17,32 @@ async function bootstrap() {
   if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
   app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
 
+  // Security headers via Helmet [F-007]
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+        imgSrc: ["'self'", 'https:', 'data:', 'blob:'],
+        connectSrc: ["'self'", 'wss:', 'https:'],
+        frameAncestors: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  }));
+
+  // CORS: whitelist only KostFind production domains [F-007]
+  const allowedOrigins = [
+    'https://kostfindweb.vercel.app',
+    'http://localhost:5173', // dev
+    'http://localhost:3000',   // dev
+  ];
   app.enableCors({
-    origin: true,
+    origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
@@ -31,6 +57,9 @@ async function bootstrap() {
       },
     }),
   );
+
+  // Parse cookies for httpOnly JWT authentication [F-002]
+  app.use(cookieParser());
 
   const httpAdapter = app.get(HttpAdapterHost);
   app.useGlobalFilters(new AllExceptionsFilter(httpAdapter));

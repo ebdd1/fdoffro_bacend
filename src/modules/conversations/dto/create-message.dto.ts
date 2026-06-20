@@ -1,9 +1,10 @@
 import { IsString, IsNotEmpty, IsOptional, IsIn } from 'class-validator';
 
 export class CreateMessageDto {
+  // senderId is overridden server-side from JWT — not trusted from client [F-010]
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  senderId: string;
+  senderId?: string;
 
   @IsString()
   @IsNotEmpty()

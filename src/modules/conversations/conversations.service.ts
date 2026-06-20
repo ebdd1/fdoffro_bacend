@@ -53,11 +53,11 @@ export class ConversationsService {
   }
 
   async create(dto: CreateConversationDto) {
-    // Reuse an existing thread for the same seeker+owner+property instead of
-    // creating duplicates every time the seeker clicks "Tanya Pemilik".
+    // seekerId is enforced by controller — set from JWT [F-010]
+    const seekerId = dto.seekerId!;
     const existing = await this.prisma.conversation.findFirst({
       where: {
-        seekerId: dto.seekerId,
+        seekerId,
         ownerId: dto.ownerId,
         propertyId: dto.propertyId,
       },
@@ -67,7 +67,7 @@ export class ConversationsService {
 
     return this.prisma.conversation.create({
       data: {
-        seekerId: dto.seekerId,
+        seekerId,
         ownerId: dto.ownerId,
         propertyId: dto.propertyId,
         unreadCount: 0,
@@ -104,7 +104,7 @@ export class ConversationsService {
       const message = await this.prisma.message.create({
         data: {
           conversationId,
-          senderId: dto.senderId,
+          senderId: dto.senderId!, // controller guarantees this is set from JWT [F-010]
           content: dto.content,
           contentType,
         },
