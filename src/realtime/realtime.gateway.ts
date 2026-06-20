@@ -6,14 +6,19 @@ import {
   ConnectedSocket,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
+import { createAdapter } from '@socket.io/redis-adapter';
+import { createClient } from 'redis';
 
 /**
  * Realtime gateway with JWT-authenticated handshake [F-014].
  * Clients must provide a valid Bearer token in the auth handshake.
  * User identity is extracted server-side — not trusted from client emit.
+ *
+ * Redis adapter enabled for horizontal scaling across multiple instances.
  */
 @WebSocketGateway({
   cors: {
@@ -25,7 +30,7 @@ import { JwtService } from '@nestjs/jwt';
     credentials: true,
   },
 })
-export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
@@ -33,6 +38,31 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
   private onlineUsers = new Map<string, Set<string>>();
 
   constructor(private readonly jwtService: JwtService) {}
+
+  /**
+   * Initialize Redis adapter for multi-instance Socket.IO synchronization.
+   * REDIS_URL from env — if not set, fall back to in-memory (single instance).
+   */
+  async afterInit(server: Server) {
+    const redisUrl = process.env.REDIS_URL;
+
+    if (redisUrl) {
+      try {
+        const pubClient = createClient({ url: redisUrl });
+        const subClient = pubClient.duplicate();
+
+        await Promise.all([pubClient.connect(), subClient.connect()]);
+
+        server.adapter(createAdapter(pubClient, subClient));
+        console.log('[Socket.IO] Redis adapter initialized for horizontal scaling');
+      } catch (error) {
+        console.error('[Socket.IO] Redis adapter failed to initialize:', error);
+        console.warn('[Socket.IO] Falling back to in-memory adapter (single instance only)');
+      }
+    } else {
+      console.warn('[Socket.IO] REDIS_URL not set — using in-memory adapter (single instance only)');
+    }
+  }
 
   // Verify JWT before allowing connection [F-014]
   async handleConnection(client: Socket) {
