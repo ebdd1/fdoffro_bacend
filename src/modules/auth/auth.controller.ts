@@ -17,13 +17,12 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   private setAuthCookie(res: Response, token: string) {
-    // Cloudflare strips Set-Cookie with SameSite=None unless domain is explicit first-party.
-    // Using explicit domain ensures Cloudflare treats this as a first-party cookie [F-002]
+    // httpOnly cookie for same-origin requests (dev/Railway-to-Railway).
+    // For cross-origin (Vercel → Railway), frontend uses Bearer token in Authorization header instead.
     res.cookie('auth_token', token, {
-      httpOnly: true,   // Not accessible to JavaScript [F-002]
-      secure: true,    // HTTPS only — Railway provides HTTPS [F-002]
-      sameSite: 'none', // Required for cross-origin cookie (Vercel ↔ Railway) [F-002]
-      domain: 'api-production-fafbf.up.railway.app', // Explicit first-party domain for Cloudflare [F-002]
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/',
     });
@@ -32,27 +31,22 @@ export class AuthController {
   @Post('register')
   async register(@Body() registerDto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.register(registerDto);
-    // Set httpOnly cookie alongside the token in the response body [F-002]
+    // Set cookie for same-origin; return token in body for cross-origin Bearer auth
     this.setAuthCookie(res, result.access_token);
-    // Remove token from body — cookie already carries it
-    const { access_token: _token, ...userOnly } = result;
-    return { user: userOnly };
+    return result; // { access_token, user }
   }
 
   @Post('login')
   async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(loginDto);
-    // Set httpOnly cookie alongside the token in the response body [F-002]
     this.setAuthCookie(res, result.access_token);
-    // Keep body compatible with existing frontend (still returns token for dev)
-    return result;
+    return result; // { access_token, user }
   }
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   async logout(@Request() req: any, @Res({ passthrough: true }) res: Response) {
-    // Clear httpOnly cookie [F-009]
-    res.clearCookie('auth_token', { httpOnly: true, secure: true, sameSite: 'none', domain: 'api-production-fafbf.up.railway.app', path: '/' });
+    res.clearCookie('auth_token', { httpOnly: true, secure: true, sameSite: 'strict', path: '/' });
     await this.authService.logout(req.user.id, req.user.jti);
     return { message: 'Logged out successfully' };
   }
