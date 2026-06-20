@@ -39,7 +39,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user) {
       throw new UnauthorizedException();
     }
-    // Attach jti so logout endpoint can blacklist this token [F-009]
-    return { ...user, jti: payload.jti };
+    // NEVER return password_hash — only public-safe fields [SECURITY FIX]
+    const { password_hash: _ignored, ...safeUser } = user;
+    return { ...safeUser, jti: payload.jti };
   }
 }
