@@ -63,4 +63,21 @@ export class ConversationsController {
     }
     return this.conversationsService.markRead(id);
   }
+
+  @Patch(':conversationId/messages/:messageId/read')
+  async markMessageAsRead(
+    @Request() req: any,
+    @Param('conversationId') conversationId: string,
+    @Param('messageId') messageId: string,
+  ) {
+    const conversation = await this.conversationsService.findOne(conversationId);
+    if (!conversation) {
+      throw new Error(`Conversation with ID ${conversationId} not found`);
+    }
+    // Only conversation participants can mark messages as read
+    if (conversation.seekerId !== req.user.id && conversation.ownerId !== req.user.id) {
+      throw new Error('Access denied');
+    }
+    return this.conversationsService.markMessageAsRead(messageId, req.user.id);
+  }
 }

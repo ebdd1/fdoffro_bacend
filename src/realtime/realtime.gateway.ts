@@ -164,4 +164,26 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   handlePresenceCheck() {
     return { onlineUserIds: Array.from(this.onlineUsers.keys()) };
   }
+
+  /**
+   * Mark message as read and broadcast to sender
+   */
+  @SubscribeMessage('message:read')
+  handleMessageRead(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { messageId: string; conversationId: string },
+  ) {
+    const user = (client as any).user;
+    if (!user) return { ok: false, error: 'Not authenticated' };
+
+    // Broadcast read receipt to conversation participants
+    // Backend should update DB and emit this event after persist
+    this.server.to(data.conversationId).emit('message:read:ack', {
+      messageId: data.messageId,
+      readBy: user.id,
+      readAt: new Date().toISOString(),
+    });
+
+    return { ok: true };
+  }
 }

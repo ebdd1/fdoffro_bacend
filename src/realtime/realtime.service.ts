@@ -31,6 +31,15 @@ export class RealtimeService {
     });
   }
 
+  // Broadcast read receipt to conversation participants
+  emitMessageRead(payload: { messageId: string; conversationId: string; readBy: string; readAt: Date }) {
+    this.gateway.server?.to(payload.conversationId).emit('message:read:ack', {
+      messageId: payload.messageId,
+      readBy: payload.readBy,
+      readAt: payload.readAt.toISOString(),
+    });
+  }
+
   // Push a freshly created notification to its recipient.
   emitNotification(userId: string, notification: { [k: string]: any }) {
     this.gateway.server?.to(userId).emit('notification:new', notification);

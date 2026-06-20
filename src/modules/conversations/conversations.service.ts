@@ -88,6 +88,32 @@ export class ConversationsService {
     });
   }
 
+  // Mark individual message as read
+  async markMessageAsRead(messageId: string, userId: string) {
+    const message = await this.prisma.message.update({
+      where: { id: messageId },
+      data: { readAt: new Date() },
+      include: {
+        conversation: true,
+        sender: true,
+      },
+    });
+
+    // Broadcast read receipt to sender via realtime
+    try {
+      this.realtime.emitMessageRead({
+        messageId,
+        conversationId: message.conversationId,
+        readBy: userId,
+        readAt: message.readAt!,
+      });
+    } catch (err) {
+      console.warn('Realtime read receipt emit failed:', err);
+    }
+
+    return message;
+  }
+
   async findMessages(conversationId: string) {
     return this.prisma.message.findMany({
       where: { conversationId },

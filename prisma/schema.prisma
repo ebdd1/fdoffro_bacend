@@ -127,18 +127,21 @@ model Conversation {
 }
 
 model Message {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   conversationId String
   senderId       String
   content        String
-  contentType    String   @default("text")
-  createdAt      DateTime @default(now())
+  contentType    String    @default("text")
+  createdAt      DateTime  @default(now())
+  readAt         DateTime? // null = unread, timestamp = read
+  deliveredAt    DateTime? // null = not delivered, timestamp = delivered
 
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   sender         User         @relation(fields: [senderId], references: [id])
 
   @@index([conversationId])
   @@index([senderId])
+  @@index([conversationId, readAt]) // for unread count queries
 }
 
 model Watchlist {
