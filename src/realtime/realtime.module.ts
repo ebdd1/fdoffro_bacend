@@ -7,10 +7,16 @@ import { RealtimeService } from './realtime.service';
 @Module({
   imports: [
     JwtModule.registerAsync({
-      useFactory: () => ({
-        secret: process.env.JWT_SECRET || 'super-secret-key-1234',
-        signOptions: { expiresIn: '7d' },
-      }),
+      useFactory: () => {
+        const secret = process.env.JWT_SECRET;
+        if (!secret) {
+          throw new Error('JWT_SECRET environment variable is required');
+        }
+        return {
+          secret,
+          signOptions: { expiresIn: '7d' },
+        };
+      },
     }),
   ],
   providers: [RealtimeGateway, RealtimeService],

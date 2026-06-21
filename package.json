@@ -92,7 +92,8 @@
     "testEnvironment": "node"
   },
   "overrides": {
-    "ws": "^8.21.0"
+    "ws": "^8.21.0",
+    "multer": "^2.2.0"
   },
   "prisma": {
     "seed": "./node_modules/.bin/ts-node prisma/seed.ts"

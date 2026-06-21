@@ -228,3 +228,13 @@ model SiteConfig {
 
   @@index([key])
 }
+
+model TokenBlacklist {
+  id        String   @id @default(uuid())
+  jti       String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([jti])
+  @@index([expiresAt])
+}

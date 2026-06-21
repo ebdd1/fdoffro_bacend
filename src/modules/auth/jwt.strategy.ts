@@ -11,6 +11,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private prisma: PrismaService,
     private authService: AuthService,
   ) {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET environment variable is required');
+    }
+
     super({
       // Try Authorization header first, then fall back to cookie [F-002]
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -23,13 +28,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         },
       ]),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'super-secret-key-1234',
+      secretOrKey: secret,
     });
   }
 
   async validate(payload: any) {
     // Check blacklist [F-009] — jti is added by authService at login/register
-    if (payload.jti && this.authService.isTokenInvalidated(payload.jti)) {
+    if (payload.jti && await this.authService.isTokenInvalidated(payload.jti)) {
       throw new UnauthorizedException('Token has been revoked');
     }
 

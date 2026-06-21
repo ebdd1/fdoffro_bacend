@@ -115,16 +115,25 @@ export class AuthService {
 
   // Invalidate token on logout [F-009]
   // jti = JWT "JWT ID" claim for per-token blacklist
-  private invalidatedTokens = new Set<string>();
-
+  // Persistent storage via database for restart-safe + horizontal scaling [SECURITY FIX]
   async logout(userId: string, jti?: string) {
-    if (jti) this.invalidatedTokens.add(jti);
+    if (jti) {
+      // Token expires in 7 days (match JWT expiry)
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      await this.prisma.tokenBlacklist.create({
+        data: { jti, expiresAt },
+      });
+    }
     return { message: 'Logged out successfully' };
   }
 
   // Check if a token has been invalidated (called by JWT strategy) [F-009]
-  isTokenInvalidated(jti: string): boolean {
-    return this.invalidatedTokens.has(jti);
+  async isTokenInvalidated(jti: string): Promise<boolean> {
+    const token = await this.prisma.tokenBlacklist.findUnique({
+      where: { jti },
+    });
+    // Check if token exists and hasn't expired yet
+    return !!token && token.expiresAt > new Date();
   }
 
   async getMockMe() {
