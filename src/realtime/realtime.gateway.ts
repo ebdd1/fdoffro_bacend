@@ -37,6 +37,10 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   // Presence: userId → set of connected socketIds (handles multi-tab) [presence]
   private onlineUsers = new Map<string, Set<string>>();
 
+  // Typing: key = `${userId}:${conversationId}` → timeout ID [typing]
+  private typingTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly TYPING_TIMEOUT_MS = 5000; // 5 seconds — auto-clear typing indicator
+
   constructor(private readonly jwtService: JwtService) {}
 
   /**
@@ -143,6 +147,8 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
   /**
    * Relay typing state. fromUserId is extracted from the verified socket user,
    * NOT from the client message body — prevents impersonation [F-014].
+   *
+   * Server-side timeout: if client fails to emit isTyping:false, auto-clear after 5s [typing]
    */
   @SubscribeMessage('typing')
   handleTyping(
@@ -153,6 +159,31 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, OnGa
     if (!fromUser) return { ok: false, error: 'Not authenticated' };
 
     if (data?.toUserId) {
+      const timeoutKey = `${fromUser.id}:${data.conversationId}`;
+
+      // Clear existing timeout for this user+conversation [typing]
+      const existingTimeout = this.typingTimeouts.get(timeoutKey);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+        this.typingTimeouts.delete(timeoutKey);
+      }
+
+      // If typing:true, set server-side timeout to auto-clear after 5s [typing]
+      if (data.isTyping) {
+        const timeout = setTimeout(() => {
+          this.typingTimeouts.delete(timeoutKey);
+          // Auto-send isTyping:false to recipient
+          this.server.to(data.toUserId).emit('chat:typing', {
+            conversationId: data.conversationId,
+            fromUserId: fromUser.id,
+            fromName: fromUser.name ?? fromUser.email,
+            isTyping: false,
+          });
+        }, this.TYPING_TIMEOUT_MS);
+        this.typingTimeouts.set(timeoutKey, timeout);
+      }
+
+      // Relay typing state to recipient
       this.server.to(data.toUserId).emit('chat:typing', {
         conversationId: data.conversationId,
         fromUserId: fromUser.id,
