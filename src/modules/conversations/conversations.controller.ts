@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
 import { ConversationsService } from './conversations.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { QueryMessagesDto } from './dto/query-messages.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 /** All conversation routes require authentication [F-010 IDOR fix] */
@@ -26,7 +27,11 @@ export class ConversationsController {
 
   // Only participants of the conversation may read messages [F-010]
   @Get(':id/messages')
-  async getMessages(@Request() req: any, @Param('id') id: string) {
+  async getMessages(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Query() query: QueryMessagesDto,
+  ) {
     const conversation = await this.conversationsService.findOne(id);
     if (!conversation) {
       throw new Error(`Conversation with ID ${id} not found`);
@@ -35,7 +40,8 @@ export class ConversationsController {
     if (conversation.seekerId !== req.user.id && conversation.ownerId !== req.user.id) {
       throw new Error('Access denied');
     }
-    return this.conversationsService.findMessages(id);
+    // CRITICAL FIX: Added pagination to prevent unbounded query on large conversations
+    return this.conversationsService.findMessages(id, query);
   }
 
   @Post(':id/messages')

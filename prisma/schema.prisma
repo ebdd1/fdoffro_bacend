@@ -142,6 +142,7 @@ model Message {
   @@index([conversationId])
   @@index([senderId])
   @@index([conversationId, readAt]) // for unread count queries
+  @@index([conversationId, createdAt]) // CRITICAL: for cursor-based pagination performance
 }
 
 model Watchlist {

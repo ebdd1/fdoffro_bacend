@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeService } from '../../realtime/realtime.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { QueryMessagesDto } from './dto/query-messages.dto';
 
 @Injectable()
 export class ConversationsService {
@@ -114,14 +115,74 @@ export class ConversationsService {
     return message;
   }
 
-  async findMessages(conversationId: string) {
-    return this.prisma.message.findMany({
-      where: { conversationId },
-      orderBy: { createdAt: 'asc' },
+  /**
+   * Fetch messages with cursor-based pagination.
+   *
+   * CRITICAL FIX: Previous implementation fetched ALL messages without limit,
+   * causing unbounded queries that crash the database with large conversations.
+   *
+   * Pagination strategy:
+   * - Default: 50 messages per page
+   * - Cursor: Message ID to seek from (for stable pagination)
+   * - Direction: 'before' for older, 'after' for newer
+   *
+   * Performance: Uses composite index (conversationId, createdAt)
+   * for O(1) cursor seek instead of OFFSET which is O(n).
+   */
+  async findMessages(conversationId: string, dto: QueryMessagesDto) {
+    const limit = Math.min(dto.limit ?? 50, 100); // Cap at 100
+    const cursorId = dto.cursor;
+    const direction = dto.direction ?? 'after';
+
+    // Build query with cursor-based pagination
+    const whereClause: any = { conversationId };
+
+    if (cursorId) {
+      // Get cursor message to determine direction
+      const cursorMessage = await this.prisma.message.findUnique({
+        where: { id: cursorId },
+        select: { createdAt: true },
+      });
+
+      if (cursorMessage) {
+        if (direction === 'before') {
+          // Load messages OLDER than cursor (scroll up in chat)
+          whereClause.createdAt = { lt: cursorMessage.createdAt };
+        } else {
+          // Load messages NEWER than cursor (scroll down)
+          whereClause.createdAt = { gt: cursorMessage.createdAt };
+        }
+      }
+    }
+
+    // Fetch one extra to determine if there are more messages
+    const messages = await this.prisma.message.findMany({
+      where: whereClause,
+      orderBy: { createdAt: direction === 'before' ? 'desc' : 'asc' },
+      take: limit + 1, // Fetch one extra to check for next page
       include: {
         sender: true,
       },
     });
+
+    // Determine if there are more messages
+    const hasMore = messages.length > limit;
+    const paginatedMessages = hasMore ? messages.slice(0, limit) : messages;
+
+    // For 'before' direction, reverse to get chronological order
+    const orderedMessages = direction === 'before' ? paginatedMessages.reverse() : paginatedMessages;
+
+    // Calculate next cursor (last message's ID for forward pagination)
+    const nextCursor = hasMore
+      ? paginatedMessages[paginatedMessages.length - 1].id
+      : null;
+
+    return {
+      messages: orderedMessages,
+      nextCursor,
+      hasMore,
+      total: paginatedMessages.length,
+    };
   }
 
   async createMessage(conversationId: string, dto: CreateMessageDto) {
